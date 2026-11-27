@@ -1,0 +1,58 @@
+
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Unzip project
+        run: unzip -q "*.zip"
+
+      - name: Set server URL
+        working-directory: seotime-app
+        env:
+          SERVER_URL: ${{ vars.SERVER_URL }}
+        run: |
+          if [ -z "$SERVER_URL" ]; then echo "Set repo variable SERVER_URL"; exit 1; fi
+          sed -i "s|https://YOUR-DOMAIN.ir|$SERVER_URL|" capacitor.config.json
+
+      - name: Install dependencies
+        working-directory: seotime-app
+        run: npm install
+
+      - name: Add Android platform
+        working-directory: seotime-app
+        run: npx cap add android
+
+      - name: Generate app icons
+        working-directory: seotime-app
+        run: |
+          npm install --no-save @capacitor/assets
+          npx capacitor-assets generate --android --iconBackgroundColor '#08090e' --splashBackgroundColor '#07080f'
+
+      - name: Sync
+        working-directory: seotime-app
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: seotime-app/android
+        run: ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: seotime-apk
+          path: seotime-app/android/app/build/outputs/apk/debug/app-debug.apk
